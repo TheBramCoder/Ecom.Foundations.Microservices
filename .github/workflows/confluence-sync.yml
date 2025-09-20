@@ -1,0 +1,25 @@
+name: Sync Diagrams to Confluence
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/diagrams/**.mmd' # This triggers on a push to a diagram file
+  workflow_dispatch: {} # This adds a manual "Run workflow" button in the UI
+
+jobs:
+  sync_to_confluence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Publish to Confluence
+        uses: d-d-a/confluence-publish-action@v1 # Example action
+        with:
+          confluence-base-url: ${{ secrets.CONFLUENCE_URL }}
+          confluence-username: ${{ secrets.ATLASSIAN_USERNAME }}
+          confluence-api-token: ${{ secrets.CONFLUENCE_API_TOKEN }}
+          space-key: '~712020f01bdaf0ecef448ca1359fcdcda1d355'
+          title: 'Ecom.Foundations.Microservices'
+          body-content: 'docs/diagrams/02-04-container.mmd'
