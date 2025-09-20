@@ -1,0 +1,31 @@
+graph TD
+    subgraph "Azure"
+        subgraph "Azure Container Apps"
+            apiGateway[YARP API Gateway]
+            catalogService[Catalog Service]
+            basketService[Basket Service]
+            discountService[Discount / Promotions]
+            orderService[Ordering Service]
+            paymentService[Payment Service]
+            shippingService[Shipping Service]
+            notificationService[Notification Service]
+            identityService[Identity Service]
+        end
+
+        subgraph "Managed Services"
+            catalogDb((Catalog DB))
+            basketDb((Basket DB))
+            identityDb((Identity DB))
+            orderDb((Ordering DB))
+            discountDb((Discount DB))
+            shippingDb((Shipping DB))
+            cacheRedis((Azure Cache for Redis))
+            messageBus[Azure Service Bus]
+            azureMonitor[Azure Monitor]
+        end
+    end
+
+    subgraph "CI/CD & Registry"
+        ci[GitHub Actions]
+        registry[GitHub Container Registry]
+    end

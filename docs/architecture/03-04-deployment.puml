@@ -1,0 +1,46 @@
+@startuml "EcomFoundations C4 Deployment"
+
+' Use C4 PlantUML library
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+' -----------------------
+' Deployment Node
+' -----------------------
+Deployment_Node(azure, "Azure", "Cloud") {
+    Deployment_Node(containerApps, "Azure Container Apps", "Serverless container hosting") {
+        Container(apiGateway, "YARP API Gateway")
+        Container(catalogService, "Catalog Service")
+        Container(basketService, "Basket Service")
+        Container(discountService, "Discount / Promotions")
+        Container(orderService, "Ordering Service")
+        Container(paymentService, "Payment Service")
+        Container(shippingService, "Shipping Service")
+        Container(notificationService, "Notification Service")
+        Container(identityService, "Identity Service")
+    }
+    Deployment_Node(managed, "Managed Services", "PaaS") {
+        ContainerDb(catalogDb, "Azure PostgreSQL")
+        ContainerDb(basketDb, "Azure PostgreSQL")
+        ContainerDb(identityDb, "Azure PostgreSQL")
+        ContainerDb(orderDb, "Azure SQL")
+        ContainerDb(discountDb, "Azure PostgreSQL")
+        ContainerDb(shippingDb, "Azure PostgreSQL")
+        Container(cacheRedis, "Azure Cache for Redis")
+        Container(messageBus, "Azure Service Bus")
+        Container(azureMonitor, "Azure Monitor")
+    }
+}
+Deployment_Node(delivery, "CI/CD & Registry", "External Services") {
+    Container(ci, "GitHub Actions")
+    Container(registry, "GitHub Container Registry")
+}
+
+' -----------------------
+' Relationships (optional, for deployment view)
+' -----------------------
+Rel(ci, registry, "Pushes images to", "OCI images")
+Rel(ci, containerApps, "Deploys containers to", "Azure Container Apps")
+Rel(ci, managed, "Configures services", "Terraform / Bicep")
+Rel(containerApps, managed, "Communicates with")
+
+@enduml

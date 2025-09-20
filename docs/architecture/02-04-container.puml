@@ -1,0 +1,94 @@
+@startuml "EcomFoundations C4 Container"
+
+' Use C4 PlantUML library
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+Person(customer, "Customer", "Web/Mobile user")
+Person(admin, "Administrator", "Internal operator")
+System_Ext(stripe, "Stripe", "Payment gateway")
+System_Ext(sendgrid, "SendGrid", "Email provider")
+System_Ext(azureAD, "Azure AD", "External IdP for admin SSO")
+
+System_Boundary(ecom, "Ecom.Foundations.Microservices") {
+    Container(apiGateway, "YARP API Gateway", "Reverse proxy", "Routes requests, JWT validation")
+    Container(identityService, "Identity Service", "ASP.NET Core Identity", "Manages customer accounts and issues JWTs")
+    Container(catalogService, "Catalog Service", ".NET 9", "Product catalog APIs")
+    Container(basketService, "Basket Service", ".NET 9", "Shopping cart operations")
+    Container(discountService, "Discount / Promotions", "N-Layer (.NET)", "Promotion rules, coupons")
+    Container(orderService, "Ordering Service", "Clean Architecture (.NET)", "Order lifecycle & transactions")
+    Container(paymentService, "Payment Service", "Node.js", "Handles payment gateway integration")
+    Container(shippingService, "Shipping / Fulfillment", "Node.js", "Tracks fulfillment")
+    Container(notificationService, "Notification Service", "Node.js", "Handles email/SMS notifications")
+
+    ContainerDb(catalogDb, "Catalog DB", "Azure PostgreSQL", "Product data")
+    ContainerDb(basketDb, "Basket DB", "Azure PostgreSQL", "Basket persistence")
+    ContainerDb(discountDb, "Discount DB", "Azure PostgreSQL", "Promotion rules")
+    ContainerDb(orderDb, "Ordering DB", "Azure SQL", "Orders data")
+    ContainerDb(identityDb, "Identity DB", "Azure PostgreSQL", "User credentials")
+    ContainerDb(shippingDb, "Shipping DB", "Azure PostgreSQL", "Shipping records")
+
+    Container(cacheRedis, "Azure Cache for Redis", "Redis", "Session, read-cache, payment state")
+    Container(messageBus, "Azure Service Bus", "Message broker", "Event-driven backbone")
+    Container(azureMonitor, "Azure Monitor", "Monitoring", "Metrics, logs")
+    Container(ci, "GitHub Actions", "CI/CD pipeline", "Automates builds & deployments")
+    Container(registry, "GitHub Container Registry", "Image registry", "Stores Docker images")
+}
+
+' -----------------------
+' Relationships
+' -----------------------
+Rel(customer, apiGateway, "HTTPS", "REST/gRPC")
+Rel(admin, apiGateway, "HTTPS", "Admin UI")
+Rel(apiGateway, identityService, "Validates JWTs", "OAuth2")
+Rel(customer, identityService, "Requests tokens", "OIDC")
+Rel(apiGateway, catalogService, "HTTP")
+Rel(apiGateway, basketService, "gRPC")
+Rel(apiGateway, orderService, "HTTP")
+Rel(apiGateway, paymentService, "HTTP")
+Rel(apiGateway, shippingService, "HTTP")
+Rel(apiGateway, discountService, "HTTP")
+
+Rel(basketService, discountService, "Checks promotion", "gRPC")
+Rel(paymentService, stripe, "Processes payment", "HTTPS")
+Rel(notificationService, sendgrid, "Sends emails", "HTTPS")
+Rel(admin, identityService, "Authenticates via AAD", "OIDC")
+Rel(identityService, azureAD, "Authenticates admins", "OIDC")
+
+' Event-driven flows
+Rel(catalogService, messageBus, "Publishes", "ProductUpdated")
+Rel(basketService, messageBus, "Publishes", "BasketCheckedOut")
+Rel(orderService, messageBus, "Publishes", "OrderCreated/Completed")
+Rel(paymentService, messageBus, "Publishes", "PaymentSucceeded/Failed")
+Rel(messageBus, notificationService, "Delivers events")
+Rel(messageBus, shippingService, "Delivers events")
+Rel(messageBus, orderService, "Delivers events")
+
+' Data storage
+Rel(catalogService, catalogDb, "Reads/Writes")
+Rel(basketService, basketDb, "Reads/Writes")
+Rel(basketService, cacheRedis, "Caches session")
+Rel(paymentService, cacheRedis, "Caches payment state")
+Rel(discountService, discountDb, "Reads/Writes")
+Rel(orderService, orderDb, "Reads/Writes")
+Rel(identityService, identityDb, "Reads/Writes")
+Rel(shippingService, shippingDb, "Reads/Writes")
+
+' Observability & CI/CD
+Rel(azureMonitor, catalogService, "Collects metrics/logs")
+Rel(azureMonitor, basketService, "Collects metrics/logs")
+Rel(azureMonitor, orderService, "Collects metrics/logs")
+Rel(azureMonitor, paymentService, "Collects metrics/logs")
+Rel(azureMonitor, shippingService, "Collects metrics/logs")
+Rel(azureMonitor, identityService, "Collects metrics/logs")
+Rel(azureMonitor, notificationService, "Collects metrics/logs")
+Rel(ci, registry, "Pushes images")
+Rel(ci, apiGateway, "Deploys to")
+Rel(ci, catalogService, "Deploys to")
+Rel(ci, basketService, "Deploys to")
+Rel(ci, orderService, "Deploys to")
+Rel(ci, paymentService, "Deploys to")
+Rel(ci, shippingService, "Deploys to")
+Rel(ci, notificationService, "Deploys to")
+Rel(ci, identityService, "Deploys to")
+
+@enduml

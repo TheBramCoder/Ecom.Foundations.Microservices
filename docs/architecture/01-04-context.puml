@@ -1,0 +1,24 @@
+@startuml "EcomFoundations C4 Context"
+
+' Use C4 PlantUML library
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+Person(customer, "Customer", "Web/Mobile user")
+Person(admin, "Administrator", "Internal operator")
+
+System_Ext(stripe, "Stripe", "Payment gateway")
+System_Ext(sendgrid, "SendGrid", "Email provider")
+System_Ext(azureAD, "Azure AD", "External IdP for admin SSO")
+System_Ext(ci_cd, "CI/CD & Registry", "GitHub Actions / Container Registry")
+
+System(ecom, "Ecom.Foundations.Microservices", "Online e-commerce platform for retail")
+
+Rel(customer, ecom, "Uses", "HTTPS")
+Rel(admin, ecom, "Manages", "HTTPS")
+Rel(ecom, stripe, "Integrates with", "HTTPS")
+Rel(ecom, sendgrid, "Uses", "HTTPS")
+Rel(admin, ecom, "Authenticates via", "OIDC")
+Rel(ecom, azureAD, "Uses for SSO", "OIDC/SAML")
+Rel(ci_cd, ecom, "Deploys", "Container Images")
+
+@enduml

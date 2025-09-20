@@ -1,0 +1,85 @@
+graph TD
+    subgraph "Ecom.Foundations.Microservices"
+        apiGateway[YARP API Gateway]
+        identityService[Identity Service]
+        catalogService[Catalog Service]
+        basketService[Basket Service]
+        discountService[Discount / Promotions]
+        orderService[Ordering Service]
+        paymentService[Payment Service]
+        shippingService[Shipping / Fulfillment]
+        notificationService[Notification Service]
+
+        catalogDb((Catalog DB))
+        basketDb((Basket DB))
+        discountDb((Discount DB))
+        orderDb((Ordering DB))
+        identityDb((Identity DB))
+        shippingDb((Shipping DB))
+
+        cacheRedis((Azure Cache for Redis))
+        messageBus[Azure Service Bus]
+        azureMonitor[Azure Monitor]
+        ci[GitHub Actions]
+        registry[GitHub Container Registry]
+    end
+
+    subgraph "External Systems"
+        customer[Customer]
+        admin[Administrator]
+        stripe[Stripe]
+        sendgrid[SendGrid]
+        azureAD[Azure AD]
+    end
+
+    customer --> apiGateway
+    admin --> apiGateway
+    apiGateway --> identityService
+    customer --> identityService
+    apiGateway --> catalogService
+    apiGateway --> basketService
+    apiGateway --> orderService
+    apiGateway --> paymentService
+    apiGateway --> shippingService
+    apiGateway --> discountService
+
+    basketService --> discountService
+    paymentService --> stripe
+    notificationService --> sendgrid
+    admin --> identityService
+    identityService --> azureAD
+
+    catalogService --> messageBus
+    basketService --> messageBus
+    orderService --> messageBus
+    paymentService --> messageBus
+    messageBus --> notificationService
+    messageBus --> shippingService
+    messageBus --> orderService
+
+    catalogService --> catalogDb
+    basketService --> basketDb
+    basketService --> cacheRedis
+    paymentService --> cacheRedis
+    discountService --> discountDb
+    orderService --> orderDb
+    identityService --> identityDb
+    shippingService --> shippingDb
+
+    azureMonitor --> catalogService
+    azureMonitor --> basketService
+    azureMonitor --> orderService
+    azureMonitor --> paymentService
+    azureMonitor --> shippingService
+    azureMonitor --> identityService
+    azureMonitor --> notificationService
+
+    ci --> registry
+    ci --> apiGateway
+    ci --> catalogService
+    ci --> basketService
+    ci --> orderService
+    ci --> paymentService
+    ci --> shippingService
+    ci --> notificationService
+    ci --> identityService

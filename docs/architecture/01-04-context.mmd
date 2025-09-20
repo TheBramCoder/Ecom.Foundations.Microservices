@@ -1,0 +1,18 @@
+graph TD
+    subgraph "External Systems"
+        customer[Customer]
+        admin[Administrator]
+        stripe[Stripe]
+        sendgrid[SendGrid]
+        azureAD[Azure AD]
+        ci_cd[CI/CD & Registry]
+    end
+
+    system(Ecom.Foundations.Microservices)
+
+    customer --> system
+    admin --> system
+    system --> stripe
+    system --> sendgrid
+    system --> azureAD
+    ci_cd --> system
