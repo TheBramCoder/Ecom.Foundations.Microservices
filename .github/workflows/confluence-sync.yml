@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      - 'docs/diagrams/**.mmd' # This triggers on a push to a diagram file
-  workflow_dispatch: {} # This adds a manual "Run workflow" button in the UI
+      - 'docs/diagrams/**.mmd'
+  workflow_dispatch:
 
 jobs:
   sync_to_confluence:
@@ -14,12 +14,23 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Publish to Confluence
-        uses: d-d-a/confluence-publish-action@v1 # Example action
-        with:
-          confluence-base-url: ${{ secrets.CONFLUENCE_URL }}
-          confluence-username: ${{ secrets.ATLASSIAN_USERNAME }}
-          confluence-api-token: ${{ secrets.CONFLUENCE_API_TOKEN }}
-          space-key: '~712020f01bdaf0ecef448ca1359fcdcda1d355'
-          title: 'Ecom.Foundations.Microservices'
-          body-content: 'docs/diagrams/02-04-container.mmd'
+        env:
+          CONF_URL: ${{ secrets.CONFLUENCE_URL }}
+          USERNAME: ${{ secrets.ATLASSIAN_USERNAME }}
+          API_TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
+        run: |
+          PAGE_TITLE="02-04-container"
+          SPACE_KEY="EFM"
+          BODY_CONTENT=$(cat docs/diagrams/02-04-container.mmd | sed 's/"/\\"/g')
+          
+          curl -u "$USERNAME:$API_TOKEN" \
+            -X POST "$CONF_URL/rest/api/content" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"type\":\"page\",
+              \"title\":\"$PAGE_TITLE\",
+              \"space\":{\"key\":\"$SPACE_KEY\"},
+              \"body\":{\"storage\":{\"value\":\"<pre>$BODY_CONTENT</pre>\",\"representation\":\"storage\"}}
+            }"
