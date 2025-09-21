@@ -11,46 +11,68 @@ jobs:
   publish-diagrams:
     runs-on: ubuntu-latest
     steps:
+      # 1. Checkout repo
       - uses: actions/checkout@v4
+
+      # 2. Install Node (needed for Mermaid CLI)
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      # 3. Install Mermaid CLI
       - name: Install Mermaid CLI
         run: npm install -g @mermaid-js/mermaid-cli
 
-      - name: Process all updated diagrams
+      # 4. Install jq (needed to parse JSON for page version)
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      # 5. Process all changed diagrams
+      - name: Process updated diagrams
         env:
           CONF_URL: ${{ secrets.CONFLUENCE_URL }}
           USERNAME: ${{ secrets.ATLASSIAN_USERNAME }}
           API_TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
         run: |
-          for file in $(git diff --name-only ${{ github.sha }}^ ${{ github.sha }} | grep 'docs/diagrams/.*\.mmd'); do
+          for file in $(git diff --name-only ${{ github.sha }}^ ${{ github.sha }} | grep 'docs/diagrams/.*\.mmd' || true); do
             base=$(basename "$file" .mmd)
             svg="docs/diagrams/$base.svg"
+
+            # Render Mermaid diagram to SVG
             npx mmdc -i "$file" -o "$svg"
 
-            # Lookup page ID from mapping file
+            # Lookup Confluence page ID from mapping file
             PAGE_ID=$(grep "^$base=" .confluence-pages | cut -d'=' -f2)
+            if [ -z "$PAGE_ID" ]; then
+              echo "No page ID found for $base. Skipping..."
+              continue
+            fi
+
+            # Get latest page version
             VERSION=$(curl -s -u "$USERNAME:$API_TOKEN" \
-               "$CONF_URL/rest/api/content/$PAGE_ID?expand=version" | jq '.version.number + 1')
+              "$CONF_URL/rest/api/content/$PAGE_ID?expand=version" \
+              | jq '.version.number + 1')
 
-            # Upload attachment
+            # Upload the SVG as an attachment (replaces if exists)
             curl -u "$USERNAME:$API_TOKEN" \
-               -X POST "$CONF_URL/rest/api/content/$PAGE_ID/child/attachment" \
-               -F "file=@$svg" \
-               -H "X-Atlassian-Token: no-check"
+              -X POST "$CONF_URL/rest/api/content/$PAGE_ID/child/attachment" \
+              -F "file=@$svg" \
+              -F "minorEdit=true" \
+              -H "X-Atlassian-Token: no-check"
 
-            # Update page body to display SVG
-            BODY="<ac:image><ri:attachment ri:filename=\"$base.svg\"/></ac:image>"
+            # Update page body to display the attachment
+            BODY="<ac:structured-macro ac:name=\"image\"><ri:attachment ri:filename=\"$base.svg\"/></ac:structured-macro>"
             curl -u "$USERNAME:$API_TOKEN" \
-               -X PUT "$CONF_URL/rest/api/content/$PAGE_ID" \
-               -H "Content-Type: application/json" \
-               -d "{
-                 \"id\": \"$PAGE_ID\",
-                 \"type\": \"page\",
-                 \"title\": \"$base Diagram\",
-                 \"space\": {\"key\": \"EFM\"},
-                 \"version\": {\"number\": $VERSION},
-                 \"body\": {\"storage\": {\"value\": \"$BODY\",\"representation\": \"storage\"}}
-               }"
+              -X PUT "$CONF_URL/rest/api/content/$PAGE_ID" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"id\": \"$PAGE_ID\",
+                \"type\": \"page\",
+                \"title\": \"$base Diagram\",
+                \"space\": {\"key\": \"EcomFoundationsMicroservices\"},
+                \"version\": {\"number\": $VERSION},
+                \"body\": {\"storage\": {\"value\": \"$BODY\",\"representation\": \"storage\"}}
+              }"
+
+            echo "Updated $base.svg on page $PAGE_ID"
           done
