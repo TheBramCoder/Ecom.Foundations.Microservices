@@ -1,36 +1,56 @@
-name: Sync Diagrams to Confluence
+name: Sync All Diagrams to Confluence
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
     paths:
       - 'docs/diagrams/**.mmd'
   workflow_dispatch:
 
 jobs:
-  sync_to_confluence:
+  publish-diagrams:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Mermaid CLI
+        run: npm install -g @mermaid-js/mermaid-cli
 
-      - name: Publish to Confluence
+      - name: Process all updated diagrams
         env:
           CONF_URL: ${{ secrets.CONFLUENCE_URL }}
           USERNAME: ${{ secrets.ATLASSIAN_USERNAME }}
           API_TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
         run: |
-          PAGE_TITLE="02-04-container"
-          SPACE_KEY="EFM"
-          BODY_CONTENT=$(cat docs/diagrams/02-04-container.mmd | sed 's/"/\\"/g')
-          
-          curl -u "$USERNAME:$API_TOKEN" \
-            -X POST "$CONF_URL/rest/api/content" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"type\":\"page\",
-              \"title\":\"$PAGE_TITLE\",
-              \"space\":{\"key\":\"$SPACE_KEY\"},
-              \"body\":{\"storage\":{\"value\":\"<pre>$BODY_CONTENT</pre>\",\"representation\":\"storage\"}}
-            }"
+          for file in $(git diff --name-only ${{ github.sha }}^ ${{ github.sha }} | grep 'docs/diagrams/.*\.mmd'); do
+            base=$(basename "$file" .mmd)
+            svg="docs/diagrams/$base.svg"
+            npx mmdc -i "$file" -o "$svg"
+
+            # Lookup page ID from mapping file
+            PAGE_ID=$(grep "^$base=" .confluence-pages | cut -d'=' -f2)
+            VERSION=$(curl -s -u "$USERNAME:$API_TOKEN" \
+               "$CONF_URL/rest/api/content/$PAGE_ID?expand=version" | jq '.version.number + 1')
+
+            # Upload attachment
+            curl -u "$USERNAME:$API_TOKEN" \
+               -X POST "$CONF_URL/rest/api/content/$PAGE_ID/child/attachment" \
+               -F "file=@$svg" \
+               -H "X-Atlassian-Token: no-check"
+
+            # Update page body to display SVG
+            BODY="<ac:image><ri:attachment ri:filename=\"$base.svg\"/></ac:image>"
+            curl -u "$USERNAME:$API_TOKEN" \
+               -X PUT "$CONF_URL/rest/api/content/$PAGE_ID" \
+               -H "Content-Type: application/json" \
+               -d "{
+                 \"id\": \"$PAGE_ID\",
+                 \"type\": \"page\",
+                 \"title\": \"$base Diagram\",
+                 \"space\": {\"key\": \"EFM\"},
+                 \"version\": {\"number\": $VERSION},
+                 \"body\": {\"storage\": {\"value\": \"$BODY\",\"representation\": \"storage\"}}
+               }"
+          done
